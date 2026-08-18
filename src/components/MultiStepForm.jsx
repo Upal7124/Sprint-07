@@ -1,91 +1,75 @@
 import { useState } from "react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+const formSchema = z.object({
+  name: z.string().min(1, "Name is required"),
 
+  email: z.string().email("Enter a valid email"),
+
+  age: z.coerce.number().min(18, "Age must be 18 or above"),
+
+  username: z.string().min(1, "Username is required"),
+
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
 const MultiStepForm = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    watch,
+    trigger,
+    formState: { errors },
+  } = useForm({ resolver: zodResolver(formSchema), mode: "onChange" });
   const [currentStep, setCurrentStep] = useState(1);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    age: "",
-    username: "",
-    password: "",
-  });
-  const [errors, setErrors] = useState({
-    name: "",
-    email: "",
-    age: "",
-    username: "",
-    password: "",
-  });
   const [submitted, setSubmitted] = useState(false);
 
-  const updateFormData = (field, value) => {
-    setFormData({
-      ...formData,
-      [field]: value,
-    });
-  };
-  const validateField = (field, value) => {
-    let error = "";
-    if (field === "name" && value.trim() === "") {
-      error = "Name is required";
+  const nextStep = async () => {
+    let fieldsToValidate = [];
+    if (currentStep === 1) {
+      fieldsToValidate = ["name", "email", "age"];
     }
-    if (field === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      error = "Enter a valid email";
+    if (currentStep === 2) {
+      fieldsToValidate = ["username", "password"];
     }
-    if (field === "age" && (value === "" || Number(value) < 18)) {
-      error = "Age must be 18 or above";
-    }
-    if (field === "username" && value.trim() === "") {
-      error = "Username is required";
-    }
-    if (field === "password" && value.length < 8) {
-      error = "Password must be at least 8 characters";
-    }
-    setErrors({
-      ...errors,
-      [field]: error,
-    });
-  };
-
-  const nextStep = () => {
-    if (currentStep < 3) {
+    const isValid = await trigger(fieldsToValidate);
+    if (isValid && currentStep < 3) {
       setCurrentStep(currentStep + 1);
     }
   };
-
+  const isStepValid = () => {
+    if (currentStep === 1) {
+      return (
+        watch("name") &&
+        watch("email") &&
+        watch("age") &&
+        !errors.name &&
+        !errors.email &&
+        !errors.age
+      );
+    }
+    if (currentStep === 2) {
+      return (
+        watch("username") &&
+        watch("password") &&
+        !errors.username &&
+        !errors.password
+      );
+    }
+    return true;
+  };
   const previousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
-
-  const handleSubmit = () => {
-    console.log(formData);
+  const submitForm = (data) => {
+    console.log(data);
     setSubmitted(true);
   };
   const progress = (currentStep / 3) * 100;
-  const isStepValid = () => {
-    if (currentStep === 1) {
-      return (
-        formData.name !== "" &&
-        formData.email !== "" &&
-        formData.age !== "" &&
-        errors.name === "" &&
-        errors.email === "" &&
-        errors.age === ""
-      );
-    }
-    if (currentStep === 2) {
-      return (
-        formData.username !== "" &&
-        formData.password !== "" &&
-        errors.username === "" &&
-        errors.password === ""
-      );
-    }
-    return true;
-  };
   if (submitted) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
@@ -195,7 +179,10 @@ const MultiStepForm = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50">
+        <form
+          onSubmit={handleSubmit(submitForm)}
+          className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50"
+        >
           {currentStep === 1 && (
             <div className="p-6 sm:p-10">
               <div className="mb-8">
@@ -220,11 +207,7 @@ const MultiStepForm = () => {
                   <input
                     type="text"
                     placeholder="Enter your full name"
-                    value={formData.name}
-                    onChange={(e) => {
-                      updateFormData("name", e.target.value);
-                      validateField("name", e.target.value);
-                    }}
+                    {...register("name")}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   />
                   {errors.name && (
@@ -240,17 +223,12 @@ const MultiStepForm = () => {
                   <input
                     type="email"
                     placeholder="you@example.com"
-                    value={formData.email}
-                    onChange={(e) => {
-                      updateFormData("email", e.target.value);
-                      validateField("email", e.target.value);
-                    }}
+                    {...register("email")}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   />
                   {errors.email && (
                     <p className="mt-2 text-sm text-red-500">
-                      {" "}
-                      {errors.email}{" "}
+                      {errors.email.message}
                     </p>
                   )}
                 </div>
@@ -263,15 +241,14 @@ const MultiStepForm = () => {
                   <input
                     type="number"
                     placeholder="Enter your age"
-                    value={formData.age}
-                    onChange={(e) => {
-                      updateFormData("age", e.target.value);
-                      validateField("age", e.target.value);
-                    }}
+                    {...register("age", { valueAsNumber: true })}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   />
                   {errors.age && (
-                    <p className="mt-2 text-sm text-red-500"> {errors.age} </p>
+                    <p className="mt-2 text-sm text-red-500">
+                      {" "}
+                      {errors.age.message}{" "}
+                    </p>
                   )}
                 </div>
               </div>
@@ -302,17 +279,12 @@ const MultiStepForm = () => {
                   <input
                     type="text"
                     placeholder="Choose a username"
-                    value={formData.username}
-                    onChange={(e) => {
-                      updateFormData("username", e.target.value);
-                      validateField("username", e.target.value);
-                    }}
+                    {...register("username")}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   />
                   {errors.username && (
                     <p className="mt-2 text-sm text-red-500">
-                      {" "}
-                      {errors.username}{" "}
+                      {errors.username.message}
                     </p>
                   )}
                 </div>
@@ -323,19 +295,23 @@ const MultiStepForm = () => {
                   </label>
 
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Create a secure password"
-                    value={formData.password}
-                    onChange={(e) => {
-                      updateFormData("password", e.target.value);
-                      validateField("password", e.target.value);
-                    }}
+                    {...register("password")}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    {" "}
+                    {showPassword ? "Hide Password" : "Show Password"}
+                  </button>
                   {errors.password && (
                     <p className="mt-2 text-sm text-red-500">
                       {" "}
-                      {errors.password}{" "}
+                      {errors.password.message}{" "}
                     </p>
                   )}
                 </div>
@@ -362,27 +338,27 @@ const MultiStepForm = () => {
                 <div className="flex items-center justify-between px-5 py-4">
                   <span className="text-sm text-slate-500">Full Name</span>
                   <span className="text-sm font-semibold text-slate-900">
-                    {formData.name || "Not provided"}
+                    {watch("name") || "Not provided"}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between px-5 py-4">
                   <span className="text-sm text-slate-500">Email</span>
                   <span className="text-sm font-semibold text-slate-900">
-                    {formData.email || "Not provided"}
+                    {watch("email") || "Not provided"}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between px-5 py-4">
                   <span className="text-sm text-slate-500">Age</span>
                   <span className="text-sm font-semibold text-slate-900">
-                    {formData.age || "Not provided"}
+                    {watch("age") || "Not provided"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-4">
                   <span className="text-sm text-slate-500">Username</span>
                   <span className="text-sm font-semibold text-slate-900">
-                    {formData.username || "Not provided"}
+                    {watch("username") || "Not provided"}
                   </span>
                 </div>
 
@@ -414,6 +390,7 @@ const MultiStepForm = () => {
 
             {currentStep < 3 ? (
               <button
+                type="button"
                 onClick={nextStep}
                 disabled={!isStepValid()}
                 className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-40"
@@ -423,14 +400,15 @@ const MultiStepForm = () => {
               </button>
             ) : (
               <button
-                onClick={handleSubmit}
+                type="submit"
                 className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200"
               >
+                {" "}
                 Submit
               </button>
             )}
           </div>
-        </div>
+        </form>
 
         <p className="mt-6 text-center text-xs text-slate-400">
           Your information is securely handled and never shared without your
